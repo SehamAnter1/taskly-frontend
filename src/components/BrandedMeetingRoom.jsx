@@ -1238,14 +1238,19 @@ export default function BrandedMeetingRoom() {
           <div className="text-sm font-semibold text-blue-900 mb-3">How to Fix:</div>
           <div className="text-xs text-blue-800 space-y-3">
             <div>
-              <div className="mb-2 font-semibold">Option 1: Use Token Generator (Easiest)</div>
-              <a 
-                href="/token-generator.html" 
-                target="_blank"
-                className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm font-medium"
-              >
-                Open Token Generator
-              </a>
+              <div className="mb-2 font-semibold">Option 1: Use Token Generator</div>
+              <div className="flex gap-2 mb-2">
+                <a 
+                  href="/token-generator.html" 
+                  target="_blank"
+                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm font-medium"
+                >
+                  Browser Generator
+                </a>
+                <div className="text-xs text-gray-600 self-center">
+                  (If 401 errors, use Node.js script below)
+                </div>
+              </div>
               <div className="mt-2 text-blue-600 text-xs">
                 Enter your LiveKit credentials (API Key, Secret, Server URL) and generate a complete test URL
               </div>
