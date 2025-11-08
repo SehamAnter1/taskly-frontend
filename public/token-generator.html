@@ -152,7 +152,9 @@
         <p class="subtitle">Generate a token to test your meeting room</p>
         
         <div class="info">
-            <strong>Need credentials?</strong> Sign up at <a href="https://livekit.io" target="_blank">livekit.io</a> to get your API Key, Secret, and Server URL.
+            <strong>Need credentials?</strong> Sign up at <a href="https://livekit.io" target="_blank">livekit.io</a> to get your API Key, Secret, and Server URL.<br>
+            <strong>Server URL format:</strong> <code>wss://your-project-name.livekit.cloud</code> (for LiveKit Cloud)<br>
+            <strong>Where to find it:</strong> LiveKit Dashboard → Your Project → Server URL section
         </div>
 
         <form id="tokenForm">
@@ -263,7 +265,7 @@
                 const token = `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
                 
                 const currentUrl = window.location.origin;
-                const testUrl = `${currentUrl}/?token=${encodeURIComponent(token)}&user=${userName}&room=${roomName}`;
+                const testUrl = `${currentUrl}/?token=${encodeURIComponent(token)}&user=${userName}&room=${roomName}&serverUrl=${encodeURIComponent(serverUrl)}`;
                 
                 document.getElementById('tokenDisplay').textContent = token;
                 document.getElementById('urlDisplay').textContent = testUrl;

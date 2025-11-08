@@ -5,10 +5,14 @@
 ### Step 1: Get LiveKit Credentials
 1. Sign up at [livekit.io](https://livekit.io) (free tier available)
 2. Create a project
-3. Get your:
-   - API Key
-   - API Secret  
-   - Server URL (e.g., `wss://your-project.livekit.cloud`)
+3. Get your credentials from the LiveKit Dashboard:
+   - **Server URL**: Found in your project dashboard (e.g., `wss://your-project.livekit.cloud`)
+     - Format: `wss://[your-project-name].livekit.cloud`
+     - Must use `wss://` (secure WebSocket), not `http://` or `https://`
+   - **API Key**: Found in "API Keys" section (e.g., `devkey`)
+   - **API Secret**: Found in "API Keys" section (long string)
+
+**Note:** See [HOW_TO_GET_LIVEKIT_URL.md](./HOW_TO_GET_LIVEKIT_URL.md) for detailed instructions on finding your server URL.
 
 ### Step 2: Generate a Token
 

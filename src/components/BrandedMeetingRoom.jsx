@@ -50,26 +50,7 @@ function CustomRoomContent() {
   
 
 
-  const { localParticipant } = useLocalParticipant();
-useEffect(() => {
-  const startLocalTracks = async () => {
-    try {
-      // ✅ Create both audio and video tracks
-      const tracks = await createLocalTracks({ audio: true, video: true });
-
-      // ✅ Publish each to LiveKit
-      for (const track of tracks) {
-        await localParticipant.publishTrack(track);
-      }
-
-      console.log('✅ Local tracks published:', tracks);
-    } catch (err) {
-      console.error('❌ Failed to create/publish local tracks:', err);
-    }
-  };
-
-  startLocalTracks();
-}, [localParticipant]);
+  // Removed duplicate track creation - handled in the ensurePublished effect below
 
   // Ensure local tracks are created & published when connected
   useEffect(() => {
@@ -90,25 +71,59 @@ useEffect(() => {
         if (hasPublished) return;
 
         setPublishing(true);
-        const created = await createLocalTracks({ 
-          audio: true, 
-          video: { resolution: '720p' } 
-        });
-        if (cancelled) return;
+        
+        // Try to create tracks - handle errors gracefully
+        try {
+          const created = await createLocalTracks({ 
+            audio: true, 
+            video: { resolution: '720p' } 
+          });
+          if (cancelled) return;
 
-        for (const t of created) {
-          await lp.publishTrack(t.track);
-          // Store references to local tracks for mute/unmute
-          if (t.kind === 'audio') {
-            setLocalAudioTrack(t);
-          } else if (t.kind === 'video') {
-            setLocalVideoTrack(t);
+          for (const t of created) {
+            await lp.publishTrack(t.track);
+            // Store references to local tracks for mute/unmute
+            if (t.kind === 'audio') {
+              setLocalAudioTrack(t);
+            } else if (t.kind === 'video') {
+              setLocalVideoTrack(t);
+            }
+          }
+        } catch (deviceError) {
+          // If video fails, try audio only
+          if (deviceError.name === 'NotFoundError' || deviceError.message.includes('device')) {
+            console.warn('Camera/microphone not available, trying audio only...');
+            try {
+              const audioOnly = await createLocalTracks({ 
+                audio: true, 
+                video: false 
+              });
+              if (cancelled) return;
+              
+              for (const t of audioOnly) {
+                await lp.publishTrack(t.track);
+                if (t.kind === 'audio') {
+                  setLocalAudioTrack(t);
+                }
+              }
+              setError('Camera not available. Joined with audio only.');
+            } catch (audioError) {
+              // If audio also fails, just join without publishing
+              console.warn('Could not access any media devices. Joining without publishing tracks.');
+              setError('Could not access camera/microphone. You can join but won\'t be able to share video/audio.');
+            }
+          } else {
+            throw deviceError;
           }
         }
+        
         setPublishing(false);
       } catch (err) {
         setPublishing(false);
-        setError(`Failed to access camera/microphone: ${err.message}`);
+        // Don't show error for permission denials - user can still join
+        if (err.name !== 'NotAllowedError' && err.name !== 'NotFoundError') {
+          setError(`Failed to access camera/microphone: ${err.message}`);
+        }
         console.error('Failed to create/publish local tracks', err);
       }
     }
@@ -205,91 +220,234 @@ useEffect(() => {
 
 
   
-  // Toggle microphone - use LocalTrack's mute/unmute methods
+  // Toggle microphone - use publication's mute/unmute methods
   const toggleMic = useCallback(async () => {
     try {
-      const lp = room?.localParticipant;
-      if (!lp) return;
-
-      // First, try to use the stored LocalTrack if available
-      if (localAudioTrack && typeof localAudioTrack.mute === 'function' && typeof localAudioTrack.unmute === 'function') {
-        try {
-          if (localAudioTrack.isMuted) {
-            await localAudioTrack.unmute();
-            setMicOn(true);
-          } else {
-            await localAudioTrack.mute();
-            setMicOn(false);
-          }
-          return;
-        } catch (err) {
-          console.warn('Failed to use stored LocalTrack, trying alternative', err);
-        }
+      // Check if room is connected first
+      if (!room || room.state !== 'connected') {
+        setError('Cannot toggle microphone. Not connected to room.');
+        console.warn('Room not connected, cannot toggle microphone');
+        return;
       }
 
-      // Fallback: check published tracks
+      const lp = room.localParticipant;
+      if (!lp) {
+        console.warn('No local participant available');
+        setError('Local participant not available. Please wait for connection.');
+        return;
+      }
+
+      // Get all microphone publications
       const trackPubs = Array.from(lp.trackPublications.values());
-      const pubs = trackPubs.filter(p => p.source === Track.Source.Microphone);
+      const audioPubs = trackPubs.filter(p => p.source === Track.Source.Microphone);
       
-      if (pubs.length === 0) {
+      if (audioPubs.length === 0) {
         // No audio track published, create and publish one
-        const created = await createLocalTracks({ audio: true, video: false });
-        const audioTrack = created.find(t => t.kind === 'audio');
-        if (audioTrack) {
-          await lp.publishTrack(audioTrack.track);
-          setLocalAudioTrack(audioTrack);
-          setMicOn(true);
+        // Double-check connection state before publishing
+        if (room.state !== 'connected') {
+          setError('Cannot enable microphone. Room connection lost.');
+          return;
+        }
+
+        try {
+          const created = await createLocalTracks({ audio: true, video: false });
+          if (!created || created.length === 0) {
+            throw new Error('No audio tracks created');
+          }
+          
+          // Re-check connection state after creating tracks (async operation)
+          if (room.state !== 'connected') {
+            // Clean up created tracks
+            created.forEach(t => {
+              if (t.track && typeof t.track.stop === 'function') {
+                t.track.stop();
+              }
+            });
+            setError('Cannot enable microphone. Room connection lost.');
+            return;
+          }
+          
+          // Handle both LocalTrack and MediaStreamTrack formats
+          const audioTrack = created.find(t => {
+            if (!t) return false;
+            // Check if it's a LocalTrack object with .kind property
+            if (t.kind === 'audio') return true;
+            // Check if it's a MediaStreamTrack with .kind property
+            if (t.track && t.track.kind === 'audio') return true;
+            return false;
+          });
+          
+          if (audioTrack) {
+            // Handle both formats: LocalTrack object or MediaStreamTrack
+            const trackToPublish = audioTrack.track || audioTrack;
+            if (trackToPublish) {
+              // Final check before publishing
+              if (room.state !== 'connected' || !lp) {
+                if (trackToPublish.stop) trackToPublish.stop();
+                setError('Cannot enable microphone. Room connection lost.');
+                return;
+              }
+              
+              await lp.publishTrack(trackToPublish);
+              setLocalAudioTrack(audioTrack);
+              setMicOn(true);
+            } else {
+              throw new Error('Audio track has no track property');
+            }
+          } else {
+            throw new Error('Could not find audio track in created tracks');
+          }
+        } catch (err) {
+          console.error('Failed to create audio track', err);
+          if (err.message && err.message.includes('not connected')) {
+            setError('Cannot enable microphone. Please wait for room connection.');
+          } else if (err.name === 'NotAllowedError') {
+            setError('Microphone permission denied. Please allow microphone access in your browser settings.');
+          } else if (err.name === 'NotFoundError') {
+            setError('No microphone found. Please connect a microphone and try again.');
+          } else if (err.message && err.message.includes('constraints')) {
+            setError('Microphone device error. Please check your microphone connection and browser permissions.');
+          } else {
+            setError(`Failed to enable microphone: ${err.message || 'Unknown error'}`);
+          }
         }
         return;
       }
 
-      // Get the publication and check if we can find the LocalTrack
-      const audioPub = pubs[0];
+      // Use the first audio publication
+      const audioPub = audioPubs[0];
+      if (!audioPub) {
+        console.warn('Audio publication not found');
+        return;
+      }
+
+      // Check current mute state
       const isCurrentlyMuted = audioPub.isMuted || false;
-      
-      // Try to find the LocalTrack from the publication's trackSid
-      // If we can't use the LocalTrack directly, use unpublish/republish
+
+      // Try to use publication's mute/unmute methods first (most reliable)
+      if (typeof audioPub.setMuted === 'function') {
+        try {
+          await audioPub.setMuted(!isCurrentlyMuted);
+          setMicOn(isCurrentlyMuted); // Toggle state
+          return;
+        } catch (err) {
+          console.warn('Failed to use setMuted, trying alternative method', err);
+        }
+      }
+
+      // Fallback: Try to use the track directly
       const track = audioPub.track;
-      
-      if (track instanceof MediaStreamTrack) {
-        // We need to unpublish and republish
-        await lp.unpublishTrack(track);
-        
-        if (!isCurrentlyMuted) {
-          // Was unmuted, now muted - don't republish
-          setMicOn(false);
-          setLocalAudioTrack(null); // Clear the reference since we unpublished
-        } else {
-          // Was muted, now unmuted - create and republish new track
+      if (!track) {
+        console.warn('Audio track not found in publication');
+        // Try to create a new track if we want to unmute
+        if (isCurrentlyMuted) {
+          // Check connection before creating tracks
+          if (room.state !== 'connected') {
+            setError('Cannot enable microphone. Room connection lost.');
+            return;
+          }
+
           try {
             const created = await createLocalTracks({ audio: true, video: false });
-            const newAudioTrack = created.find(t => t.kind === 'audio');
-            if (newAudioTrack) {
-              await lp.publishTrack(newAudioTrack.track);
-              setLocalAudioTrack(newAudioTrack);
-              setMicOn(true);
+            if (created && created.length > 0) {
+              // Re-check connection after async operation
+              if (room.state !== 'connected' || !lp) {
+                created.forEach(t => {
+                  if (t.track && typeof t.track.stop === 'function') {
+                    t.track.stop();
+                  }
+                });
+                setError('Cannot enable microphone. Room connection lost.');
+                return;
+              }
+
+              const audioTrack = created.find(t => {
+                if (!t) return false;
+                return t.kind === 'audio' || (t.track && t.track.kind === 'audio');
+              });
+              if (audioTrack) {
+                const trackToPublish = audioTrack.track || audioTrack;
+                if (trackToPublish) {
+                  // Unpublish old track if it exists
+                  if (audioPub.trackSid) {
+                    try {
+                      await lp.unpublishTrack(audioPub.trackSid);
+                    } catch (unpubErr) {
+                      console.warn('Failed to unpublish old track', unpubErr);
+                    }
+                  }
+                  
+                  // Final connection check before publishing
+                  if (room.state !== 'connected' || !lp) {
+                    if (trackToPublish.stop) trackToPublish.stop();
+                    setError('Cannot enable microphone. Room connection lost.');
+                    return;
+                  }
+
+                  await lp.publishTrack(trackToPublish);
+                  setLocalAudioTrack(audioTrack);
+                  setMicOn(true);
+                }
+              }
             }
           } catch (err) {
-            console.error('Failed to create new audio track', err);
-            setError('Failed to unmute microphone. Please check permissions.');
-            setMicOn(false);
+            console.error('Failed to recreate audio track', err);
+            if (err.message && err.message.includes('not connected')) {
+              setError('Cannot enable microphone. Please wait for room connection.');
+            } else if (err.message && err.message.includes('constraints')) {
+              setError('Microphone device error. Please check your microphone connection.');
+            } else {
+              setError('Failed to toggle microphone. Please try again.');
+            }
           }
+        } else {
+          // Track is missing but we want to mute - already muted, nothing to do
+          setMicOn(false);
         }
-      } else {
-        // If it's a LocalTrack, use its methods directly
-        if (track && typeof track.mute === 'function' && typeof track.unmute === 'function') {
-          if (track.isMuted) {
+        return;
+      }
+
+      // Try LocalTrack methods
+      if (track && typeof track.mute === 'function' && typeof track.unmute === 'function') {
+        try {
+          if (isCurrentlyMuted) {
             await track.unmute();
             setMicOn(true);
           } else {
             await track.mute();
             setMicOn(false);
           }
+          return;
+        } catch (err) {
+          console.warn('Failed to use track mute/unmute, trying MediaStreamTrack method', err);
         }
+      }
+
+      // Fallback: For MediaStreamTrack, use enabled property
+      if (track instanceof MediaStreamTrack) {
+        try {
+          track.enabled = isCurrentlyMuted;
+          setMicOn(isCurrentlyMuted);
+        } catch (err) {
+          console.error('Failed to toggle MediaStreamTrack enabled state', err);
+          setError('Failed to toggle microphone. Please try again.');
+        }
+      } else {
+        console.warn('Unknown track type, cannot toggle');
+        setError('Unable to toggle microphone. Track type not supported.');
       }
     } catch (err) {
       console.error('toggleMic error', err);
-      setError(`Failed to toggle microphone: ${err.message}`);
+      const errorMessage = err.message || 'Unknown error';
+      
+      // Handle connection-related errors
+      if (errorMessage.includes('not connected') || errorMessage.includes('cannot publish track when not connected')) {
+        setError('Cannot toggle microphone. Please wait for room connection to complete.');
+      } else if (errorMessage.includes('constraints')) {
+        setError('Microphone device error. Please check your microphone connection.');
+      } else {
+        setError(`Failed to toggle microphone: ${errorMessage}`);
+      }
     }
   }, [room, localAudioTrack]);
 
@@ -353,7 +511,13 @@ useEffect(() => {
       }
     } catch (err) {
       console.error('toggleCam error', err);
-      setError(`Failed to toggle camera: ${err.message}`);
+      if (err.name === 'NotFoundError') {
+        setError('Camera not found. Please connect a camera and try again.');
+      } else if (err.name === 'NotAllowedError') {
+        setError('Camera permission denied. Please allow camera access in your browser settings.');
+      } else {
+        setError(`Failed to toggle camera: ${err.message}`);
+      }
     }
   }, [room, localVideoTrack]);
 
@@ -1024,6 +1188,8 @@ export default function BrandedMeetingRoom() {
   const searchParams = new URLSearchParams(window.location.search);
   const user = searchParams.get("user") || "Seham";
   const roomName = searchParams.get("room") || "test-room";
+  // Server URL can be passed via URL parameter or use environment variable
+  const serverUrlFromUrl = searchParams.get("serverUrl");
 
   useEffect(() => {
     const initializeToken = () => {
@@ -1081,7 +1247,7 @@ export default function BrandedMeetingRoom() {
                 Open Token Generator
               </a>
               <div className="mt-2 text-blue-600 text-xs">
-                Enter your LiveKit credentials and generate a token directly in your browser
+                Enter your LiveKit credentials (API Key, Secret, Server URL) and generate a complete test URL
               </div>
             </div>
             <div className="pt-2 border-t border-blue-200">
@@ -1121,10 +1287,28 @@ export default function BrandedMeetingRoom() {
     );
   }
 
-  // Get LiveKit server URL from environment variable
+  // Get LiveKit server URL (priority: URL param > env variable > error)
   // For production: use wss:// (secure WebSocket)
   // For local development: use ws://localhost:7880
-  const serverUrl = import.meta.env.VITE_LIVEKIT_SERVER_URL || "wss://your-project.livekit.cloud";
+  const serverUrl = serverUrlFromUrl || import.meta.env.VITE_LIVEKIT_SERVER_URL;
+  
+  if (!serverUrl) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
+        <div className="text-xl font-semibold text-red-600 mb-4">Server URL Required</div>
+        <div className="text-sm text-gray-700 mb-6 max-w-2xl text-center">
+          Please provide your LiveKit server URL either via URL parameter or environment variable.
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 max-w-2xl text-left">
+          <div className="text-sm font-semibold text-blue-900 mb-2">Options:</div>
+          <div className="text-xs text-blue-800 space-y-2">
+            <div>1. Add <code className="bg-blue-100 px-1">?serverUrl=wss://your-server.livekit.cloud</code> to your URL</div>
+            <div>2. Set <code className="bg-blue-100 px-1">VITE_LIVEKIT_SERVER_URL</code> environment variable</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <LiveKitRoom

@@ -13,12 +13,17 @@ See [QUICKSTART.md](./QUICKSTART.md) for detailed instructions on:
 
 ### Quick Token Generation:
 
-1. Get LiveKit credentials from [livekit.io](https://livekit.io)
+1. Get LiveKit credentials from [livekit.io](https://livekit.io):
+   - Sign up and create a project
+   - Get your **Server URL** (e.g., `wss://your-project.livekit.cloud`)
+   - Get your **API Key** and **API Secret** from the dashboard
 2. Run the token generator:
    ```bash
    LIVEKIT_API_KEY=xxx LIVEKIT_API_SECRET=xxx node generate-token.js
    ```
 3. Copy the generated URL and open it in your browser
+
+**Need help finding your Server URL?** See [HOW_TO_GET_LIVEKIT_URL.md](./HOW_TO_GET_LIVEKIT_URL.md)
 
 ### Development
 
