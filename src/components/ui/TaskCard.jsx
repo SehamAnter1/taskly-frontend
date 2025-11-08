@@ -35,7 +35,7 @@ function TaskCard({ id, task }) {
       {...attributes}
             onClick={() => console.log("Clicked task", task)}
 
-      className="cursor-move rounded-md border my-2 overflow-hidden grid gap-2 transition-all duration-300 bg-white/60 dark:bg-neutral-800/60 backdrop-blur-xs hover:bg-white/70 dark:hover:bg-neutral-700/70"
+      className={` ${transform?" !cursor-grabbing":"cursor-move"}  rounded-md border my-2 overflow-hidden grid gap-2 transition-all duration-300 bg-white/60 dark:bg-neutral-800/60 backdrop-blur-xs hover:bg-white/70 dark:hover:bg-neutral-700/70`}
     >
       {task.img && (
         <img

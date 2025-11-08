@@ -1,12 +1,39 @@
-# React + Vite
+# Taskly Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React + Vite application with LiveKit video meeting integration.
 
-Currently, two official plugins are available:
+## Quick Start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### For Testing LiveKit Meetings:
 
-## Expanding the ESLint configuration
+See [QUICKSTART.md](./QUICKSTART.md) for detailed instructions on:
+- Generating tokens for testing
+- Setting up environment variables
+- Deploying to Vercel
 
-If you are developing a production application, we recommend using TypeScript and enable type-aware lint rules. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Quick Token Generation:
+
+1. Get LiveKit credentials from [livekit.io](https://livekit.io)
+2. Run the token generator:
+   ```bash
+   LIVEKIT_API_KEY=xxx LIVEKIT_API_SECRET=xxx node generate-token.js
+   ```
+3. Copy the generated URL and open it in your browser
+
+### Development
+
+```bash
+npm install
+npm run dev
+```
+
+### Deployment
+
+See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for Vercel deployment instructions.
+
+## Features
+
+- LiveKit video meetings
+- Kanban board
+- GraphQL integration
+- Modern UI with Tailwind CSS

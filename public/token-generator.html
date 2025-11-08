@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiveKit Token Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 24px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .result {
+            margin-top: 24px;
+            padding: 16px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .result h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        .token-display {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #e0e0e0;
+        }
+        .url-display {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 6px;
+            word-break: break-all;
+            font-size: 13px;
+            margin-bottom: 12px;
+            border: 1px solid #90caf9;
+        }
+        .copy-btn {
+            background: #4caf50;
+            margin-top: 8px;
+            padding: 10px;
+            font-size: 14px;
+        }
+        .copy-btn:hover {
+            background: #45a049;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            display: none;
+        }
+        .error.show {
+            display: block;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+        .info a {
+            color: #1565c0;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 LiveKit Token Generator</h1>
+        <p class="subtitle">Generate a token to test your meeting room</p>
+        
+        <div class="info">
+            <strong>Need credentials?</strong> Sign up at <a href="https://livekit.io" target="_blank">livekit.io</a> to get your API Key, Secret, and Server URL.
+        </div>
+
+        <form id="tokenForm">
+            <div class="form-group">
+                <label for="apiKey">API Key</label>
+                <input type="text" id="apiKey" name="apiKey" placeholder="Enter your LiveKit API Key" required>
+            </div>
+            <div class="form-group">
+                <label for="apiSecret">API Secret</label>
+                <input type="password" id="apiSecret" name="apiSecret" placeholder="Enter your LiveKit API Secret" required>
+            </div>
+            <div class="form-group">
+                <label for="serverUrl">Server URL</label>
+                <input type="text" id="serverUrl" name="serverUrl" placeholder="wss://your-project.livekit.cloud" value="wss://your-project.livekit.cloud" required>
+            </div>
+            <div class="form-group">
+                <label for="userName">User Name</label>
+                <input type="text" id="userName" name="userName" placeholder="Seham" value="Seham">
+            </div>
+            <div class="form-group">
+                <label for="roomName">Room Name</label>
+                <input type="text" id="roomName" name="roomName" placeholder="test-room" value="test-room">
+            </div>
+            <button type="submit">Generate Token</button>
+        </form>
+
+        <div class="error" id="error"></div>
+
+        <div class="result" id="result">
+            <h3>✅ Token Generated!</h3>
+            <div class="token-display" id="tokenDisplay"></div>
+            <div class="url-display" id="urlDisplay"></div>
+            <button class="copy-btn" onclick="copyUrl()">Copy URL</button>
+            <p style="margin-top: 12px; font-size: 12px; color: #666;">
+                Click the button above to copy the URL, then paste it in your browser to test the meeting room.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Note: This is a simplified client-side token generator
+        // For production, always generate tokens on your server
+        
+        document.getElementById('tokenForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const apiKey = document.getElementById('apiKey').value;
+            const apiSecret = document.getElementById('apiSecret').value;
+            const serverUrl = document.getElementById('serverUrl').value;
+            const userName = document.getElementById('userName').value || 'Seham';
+            const roomName = document.getElementById('roomName').value || 'test-room';
+            
+            const errorDiv = document.getElementById('error');
+            const resultDiv = document.getElementById('result');
+            errorDiv.classList.remove('show');
+            resultDiv.classList.remove('show');
+            
+            try {
+                // Simple token generation using Web Crypto API
+                // This creates a basic JWT structure (for testing only)
+                const now = Math.floor(Date.now() / 1000);
+                const exp = now + (6 * 60 * 60);
+                
+                const header = {
+                    alg: 'HS256',
+                    typ: 'JWT'
+                };
+                
+                const payload = {
+                    iss: apiKey,
+                    sub: userName,
+                    exp: exp,
+                    iat: now,
+                    nbf: now,
+                    video: {
+                        room: roomName,
+                        roomJoin: true,
+                        canPublish: true,
+                        canSubscribe: true,
+                        canPublishData: true,
+                        canUpdateMetadata: true
+                    },
+                    name: userName
+                };
+                
+                // Encode header and payload
+                const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+                const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+                
+                // Create signature using Web Crypto API
+                const secretKey = await crypto.subtle.importKey(
+                    'raw',
+                    new TextEncoder().encode(apiSecret),
+                    { name: 'HMAC', hash: 'SHA-256' },
+                    false,
+                    ['sign']
+                );
+                
+                const signature = await crypto.subtle.sign(
+                    'HMAC',
+                    secretKey,
+                    new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
+                );
+                
+                const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+                    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+                
+                const token = `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
+                
+                const currentUrl = window.location.origin;
+                const testUrl = `${currentUrl}/?token=${encodeURIComponent(token)}&user=${userName}&room=${roomName}`;
+                
+                document.getElementById('tokenDisplay').textContent = token;
+                document.getElementById('urlDisplay').textContent = testUrl;
+                document.getElementById('urlDisplay').setAttribute('data-url', testUrl);
+                resultDiv.classList.add('show');
+                
+                // Scroll to result
+                resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+            } catch (error) {
+                errorDiv.textContent = `Error: ${error.message}`;
+                errorDiv.classList.add('show');
+                console.error('Token generation error:', error);
+            }
+        });
+        
+        function copyUrl() {
+            const url = document.getElementById('urlDisplay').getAttribute('data-url');
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy. Please copy manually.');
+            });
+        }
+    </script>
+</body>
+</html>
+

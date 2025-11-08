@@ -7,7 +7,7 @@ export default function BoardUI({ columns, activeId, getTaskContentById,  }) {
     <>   
       <div className="flex  gap-4 p-4 ">
         {/* render columns */}
-        {columns.map((col) => (
+        {columns?.map((col) => (
           <DroppableColumn
           key={col.id}
           columnId={col.id}
